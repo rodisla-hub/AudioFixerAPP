@@ -23,43 +23,37 @@ with st.sidebar:
 # Carga del archivo
 audio_file = st.file_uploader("Sube tu grabación aquí", type=['mp3', 'wav', 'm4a'])
 
+# --- BLOQUE DE CÓDIGO CORREGIDO Y BLINDADO ---
+
+# Recuperamos el token de forma segura. Si no existe, devuelve None (no falla).
+replicate_token = st.secrets.get("REPLICATE_API_TOKEN")
+
 if st.button("✨ Limpiar y Mejorar Audio (Modo Pro)"):
-    if not st.secrets["REPLICATE_API_TOKEN"]:
-        st.error("Falta configurar el API Token.")
+    if not replicate_token:
+        st.error("⛔ Error: No he encontrado la llave 'REPLICATE_API_TOKEN' en los Secrets.")
+        st.info("Por favor, ve a Settings -> Secrets y asegúrate de que el nombre sea exacto.")
     else:
+        # Configurar la variable de entorno para que Replicate la lea automáticamente
+        os.environ["REPLICATE_API_TOKEN"] = replicate_token
+        
         with st.spinner('⏳ Procesando con Resemble AI... (Esto puede tardar unos minutos)'):
             try:
-                # Usamos el modelo 'resemble-enhance' que es el estándar actual
-                # Versión específica para asegurar estabilidad
+                # Tu código del modelo sigue aquí igual...
                 model_id = "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2"
                 
                 output = replicate.run(
                     model_id,
                     input={
                         "input_audio": audio_file,
-                        "denoise_flag": True,  # ¡Clave! Activa la limpieza de ruido fuerte
-                        "solver": "Midpoint",  # Algoritmo equilibrado calidad/velocidad
+                        "denoise_flag": True,
+                        "solver": "Midpoint",
                         "prior_temperature": 0.5
                     }
                 )
                 
-                # Resemble a veces devuelve una lista, tomamos el primer archivo
-                # o el archivo directo dependiendo de la respuesta.
-                # Generalmente devuelve un objeto o URI.
-                
+                # ... (resto del código de éxito igual)
                 st.success("¡Alquimia completada! Escucha la diferencia.")
-                
-                # Mostrar el audio original vs el nuevo
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("**Original**")
-                    st.audio(audio_file)
-                with col2:
-                    st.markdown("**Mejorado (Studio Quality)**")
-                    st.audio(output, format='audio/wav')
-                
-                # Link de descarga
-                st.markdown(f'<a href="{output}" download="audio_pro_venezuela.wav" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">📥 Descargar Audio Limpio</a>', unsafe_allow_html=True)
+                # ... (mostrar audios)
 
             except Exception as e:
                 st.error(f"Hubo un error técnico: {e}")
