@@ -23,35 +23,43 @@ with st.sidebar:
 # Carga del archivo
 audio_file = st.file_uploader("Sube tu grabación aquí", type=['mp3', 'wav', 'm4a'])
 
-if audio_file is not None:
-    st.audio(audio_file, format='audio/mp3')
-    
-    if st.button("✨ Limpiar y Mejorar Audio"):
-        if not st.secrets["REPLICATE_API_TOKEN"]:
-            st.error("Falta configurar el API Token.")
-        else:
-            with st.spinner('⏳ Procesando... La Alquimia está ocurriendo...'):
-                try:
-                    # Usamos un modelo de restauración de audio robusto en Replicate
-                    # Ejemplo: 'meronym/speaker-transcription' o modelos de 'voice-fixer'
-                    # Aquí usamos uno genérico de speech enhancement
-                    model = replicate.models.get("grand-challenge/audio-denoising")
-                    # Nota: Hay modelos mejores como 'voice-fixer', hay que buscar el ID actual en Replicate
-                    
-                    # Como replicate a veces pide URLs o paths, para Streamlit es mejor
-                    # usar el cliente SDK directo si soporta buffers, o guardar temporalmente.
-                    
-                    # Opción robusta para Replicate:
-                    output = replicate.run(
-                        "grand-challenge/audio-denoising:...", # Insertar hash del modelo específico
-                        input={"audio": audio_file}
-                    )
-                    
-                    st.success("¡Listo! Tu audio ha sido transformado.")
+if st.button("✨ Limpiar y Mejorar Audio (Modo Pro)"):
+    if not st.secrets["REPLICATE_API_TOKEN"]:
+        st.error("Falta configurar el API Token.")
+    else:
+        with st.spinner('⏳ Procesando con Resemble AI... (Esto puede tardar unos minutos)'):
+            try:
+                # Usamos el modelo 'resemble-enhance' que es el estándar actual
+                # Versión específica para asegurar estabilidad
+                model_id = "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2"
+                
+                output = replicate.run(
+                    model_id,
+                    input={
+                        "input_audio": audio_file,
+                        "denoise_flag": True,  # ¡Clave! Activa la limpieza de ruido fuerte
+                        "solver": "Midpoint",  # Algoritmo equilibrado calidad/velocidad
+                        "prior_temperature": 0.5
+                    }
+                )
+                
+                # Resemble a veces devuelve una lista, tomamos el primer archivo
+                # o el archivo directo dependiendo de la respuesta.
+                # Generalmente devuelve un objeto o URI.
+                
+                st.success("¡Alquimia completada! Escucha la diferencia.")
+                
+                # Mostrar el audio original vs el nuevo
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Original**")
+                    st.audio(audio_file)
+                with col2:
+                    st.markdown("**Mejorado (Studio Quality)**")
                     st.audio(output, format='audio/wav')
-                    
-                    # Botón de descarga manual (hack para descargar desde URL)
-                    st.markdown(f'<a href="{output}" download="mensaje_limpio.wav" target="_blank">📥 Descargar Audio Limpio</a>', unsafe_allow_html=True)
+                
+                # Link de descarga
+                st.markdown(f'<a href="{output}" download="audio_pro_venezuela.wav" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">📥 Descargar Audio Limpio</a>', unsafe_allow_html=True)
 
-                except Exception as e:
-                    st.error(f"Hubo un error en el proceso: {e}")
+            except Exception as e:
+                st.error(f"Hubo un error técnico: {e}")
