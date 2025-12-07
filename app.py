@@ -28,8 +28,8 @@ with st.sidebar:
     # Selector de Modo
     modo = st.radio(
         "Elige el motor:",
-        ("🛡️ Limpieza Natural (VoiceFixer)", "✨ Reconstrucción IA (Resemble)"),
-        help="VoiceFixer repara grabaciones viejas o ruidosas. Resemble intenta mejorar la calidad a estudio."
+        ("🛡️ Limpieza Natural (Denoising)", "✨ Reconstrucción IA (Resemble)"),
+        help="Limpieza Natural quita ruido de fondo (fiable). Reconstrucción mejora la voz (puede tardar)."
     )
 
 # --- ÁREA PRINCIPAL ---
@@ -45,9 +45,7 @@ if audio_file is not None:
         else:
             os.environ["REPLICATE_API_TOKEN"] = replicate_api
             
-            msg_espera = '⏳ Buscando el modelo y procesando... (Esto tarda unos minutos)'
-            
-            with st.spinner(msg_espera):
+            with st.spinner('⏳ Procesando audio... (Esto puede tardar unos minutos)'):
                 try:
                     # 1. Preparar archivo (Pasaporte)
                     file_extension = os.path.splitext(audio_file.name)[1]
@@ -59,35 +57,37 @@ if audio_file is not None:
                     
                     with open(tmp_path, "rb") as file_to_send:
                         
-                        # --- LÓGICA DE BÚSQUEDA AUTOMÁTICA DE VERSIÓN ---
-                        # Esto evita el Error 422 de "versión inválida"
+                        # --- LÓGICA BLINDADA ---
                         
                         if "Natural" in modo:
-                            # MOTOR 1: Voice Fixer (El Tractor Fiable)
-                            # Buscamos la última versión disponible automáticamente
-                            model = replicate.models.get("cjwbw/voice-fixer")
-                            version = model.latest_version
+                            # MOTOR 1: Audio Denoising (Seguridad Máxima)
+                            # Usamos el hash directo porque este modelo es muy estable y no cambia.
+                            # Esto EVITA el Error 404 de modelos borrados.
+                            model_id = "grand-challenge/audio-denoising:4f9c1788753238a2e4a6d05f3192451f8a845945c796790928e442834d9a24d7"
                             
                             output = replicate.run(
-                                f"{model.owner}/{model.name}:{version.id}",
-                                input={
-                                    "audio": file_to_send,
-                                    "mode": "high_quality" # Modo específico de este modelo
-                                }
+                                model_id,
+                                input={"audio": file_to_send}
                             )
                             
                         else:
-                            # MOTOR 2: Resemble Enhance (El Ferrari)
-                            model = replicate.models.get("resemble-ai/resemble-enhance")
-                            version = model.latest_version
+                            # MOTOR 2: Resemble Enhance (Calidad Estudio)
+                            # Aquí sí buscamos la última versión para evitar el Error 422
+                            try:
+                                model = replicate.models.get("resemble-ai/resemble-enhance")
+                                version = model.latest_version
+                                model_id_dynamic = f"{model.owner}/{model.name}:{version.id}"
+                            except:
+                                # Si falla la búsqueda, usamos el último hash conocido como respaldo
+                                model_id_dynamic = "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2"
                             
                             output = replicate.run(
-                                f"{model.owner}/{model.name}:{version.id}",
+                                model_id_dynamic,
                                 input={
                                     "input_audio": file_to_send,
                                     "denoise_flag": True,
                                     "solver": "Midpoint",
-                                    "prior_temperature": 0.1, # Creatividad baja para evitar robots
+                                    "prior_temperature": 0.1, # Creatividad baja
                                     "number_function_evaluations": 64
                                 }
                             )
@@ -105,4 +105,3 @@ if audio_file is not None:
                     if 'tmp_path' in locals() and os.path.exists(tmp_path):
                         os.remove(tmp_path)
                     st.error(f"😓 Error Técnico: {str(e)}")
-                    st.info("Nota: Si el audio es muy largo (>3 min), intenta usar 'Limpieza Natural'.")
