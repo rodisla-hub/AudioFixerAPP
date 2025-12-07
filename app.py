@@ -3,14 +3,11 @@ import replicate
 import os
 import tempfile
 import time
-import requests
-from pydub import AudioSegment
-from io import BytesIO
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="VoiceAlchemist", page_icon="🎙️")
 st.title("🎙️ VoiceAlchemist")
-st.markdown("Modelo: **Playmore Speech Enhancer (Salida MP3 Ligero)**")
+st.markdown("Modelo: **Playmore Speech Enhancer** (Salida Calidad Estudio WAV)")
 
 # --- TOKEN ---
 if "REPLICATE_API_TOKEN" in st.secrets:
@@ -24,6 +21,8 @@ with st.sidebar:
         replicate_api = st.text_input("Token r8_...", type="password")
     else:
         st.success("✅ Token Conectado")
+    
+    st.info("ℹ️ El archivo resultante será .WAV (Alta Calidad). Si pesa mucho para WhatsApp, envíalo como 'Documento'.")
 
 # --- ÁREA PRINCIPAL ---
 audio_file = st.file_uploader("Sube el audio", type=['mp3', 'wav', 'm4a', 'ogg'])
@@ -31,17 +30,16 @@ audio_file = st.file_uploader("Sube el audio", type=['mp3', 'wav', 'm4a', 'ogg']
 if audio_file is not None:
     st.audio(audio_file)
     
-    if st.button("🚀 Procesar y Convertir a MP3"):
+    if st.button("🚀 Procesar Audio"):
         if not replicate_api:
             st.error("⛔ Falta el Token.")
         else:
             os.environ["REPLICATE_API_TOKEN"] = replicate_api
             
-            with st.spinner('⏳ Procesando audio en la nube...'):
+            with st.spinner('⏳ Procesando... (Esto funciona, prometido)'):
                 tmp_path = None
-                mp3_path = None
                 try:
-                    # 1. PREPARAR ARCHIVO LOCAL
+                    # 1. GUARDAR EN DISCO (Modo Seguro)
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
                         tmp_file.write(audio_file.getvalue())
                         tmp_file.flush()
@@ -59,48 +57,22 @@ if audio_file is not None:
                             input={"audio": file_to_send}
                         )
                     
+                    # Convertir salida a texto
                     output_url = str(output)
                     
-                except Exception as e:
-                    st.error(f"😓 Error en la IA: {str(e)}")
-                    st.stop() # Paramos si falla aquí
-
-            # --- FASE 2: COMPRESIÓN A MP3 ---
-            with st.spinner('📦 Comprimiendo para WhatsApp (WAV -> MP3)...'):
-                try:
-                    # Descargamos el WAV pesado de la URL
-                    response = requests.get(output_url)
-                    audio_content = BytesIO(response.content)
+                    # 3. ÉXITO
+                    st.success("✅ ¡Audio Restaurado!")
+                    st.audio(output_url)
                     
-                    # Lo cargamos en el editor de audio
-                    audio_segment = AudioSegment.from_file(audio_content)
-                    
-                    # Lo exportamos comprimido a MP3
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
-                        # 128k es calidad estándar de MP3 (poco peso, buen sonido)
-                        audio_segment.export(tmp_mp3.name, format="mp3", bitrate="128k")
-                        mp3_path = tmp_mp3.name
-                    
-                    # ÉXITO TOTAL
-                    st.success("✅ ¡Listo! Audio optimizado para WhatsApp.")
-                    
-                    # Leemos el archivo MP3 para crear el botón de descarga
-                    with open(mp3_path, "rb") as f:
-                        mp3_bytes = f.read()
-                    
-                    st.audio(mp3_bytes, format='audio/mp3')
-                    
-                    st.download_button(
-                        label="📥 Descargar MP3 (Ligero)",
-                        data=mp3_bytes,
-                        file_name="mensaje_limpio.mp3",
-                        mime="audio/mpeg"
-                    )
+                    # Botón de descarga
+                    st.markdown(f'<a href="{output_url}" download="mensaje_restaurado.wav" style="background-color: #4CAF50; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">📥 Descargar Audio (WAV)</a>', unsafe_allow_html=True)
 
                 except Exception as e:
-                    st.error(f"😓 Error convirtiendo a MP3: {str(e)}")
+                    st.error(f"😓 Error Técnico: {str(e)}")
                 
                 finally:
-                    # Limpieza de todos los archivos temporales
-                    if tmp_path and os.path.exists(tmp_path): os.remove(tmp_path)
-                    if mp3_path and os.path.exists(mp3_path): os.remove(mp3_path)
+                    if tmp_path and os.path.exists(tmp_path):
+                        try:
+                            os.remove(tmp_path)
+                        except:
+                            pass
