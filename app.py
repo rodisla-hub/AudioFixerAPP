@@ -1,76 +1,71 @@
 import streamlit as st
 import replicate
 import os
-import requests
 
-# Configuración de la página
+# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="VoiceAlchemist", page_icon="🎙️")
 
 st.title("🎙️ VoiceAlchemist")
-st.write("Sube tu mensaje semanal. La IA eliminará el ruido y mejorará tu voz.")
+st.markdown("Herramienta de limpieza de audio profesional para **mensajes semanales**.")
 
-# --- BARRA LATERAL (SIDEBAR) ---
+# --- GESTIÓN DEL SECRETO (INVISIBLE) ---
+# Intentamos obtener el token de la "caja fuerte" de Streamlit
+if "REPLICATE_API_TOKEN" in st.secrets:
+    # Si existe, lo configuramos en silencio
+    replicate_api = st.secrets["REPLICATE_API_TOKEN"]
+    os.environ["REPLICATE_API_TOKEN"] = replicate_api
+else:
+    # Si no existe, mostramos un aviso solo para ti (el administrador)
+    replicate_api = None
+    st.error("⚙️ **Configuración Pendiente:** No se detectó el Token de IA.")
+    st.info("Socio, ve a 'Settings > Secrets' en Streamlit Cloud y pega el token como acordamos.")
+
+# --- INTERFAZ DE USUARIO ---
+# Barra lateral simple solo con instrucciones
 with st.sidebar:
-    st.header("🔑 Configuración")
-    st.markdown("Para que esto funcione, necesitas tu Token de Replicate.")
-    # AQUÍ ESTÁ EL TRUCO: Pedimos el token directamente al usuario
-    api_token_input = st.text_input(
-        "Pega aquí tu Replicate API Token (r8_...)", 
-        type="password",
-        help="El código que empieza por r8_ que copiaste de la web de Replicate"
-    )
-    
-    st.divider()
-    st.info("ℹ️ **Instrucciones:**\n1. Pega tu Token arriba.\n2. Sube tu audio.\n3. Espera la magia.\n4. Descarga.")
+    st.info("ℹ️ **Cómo usar:**\n1. Sube tu grabación.\n2. Pulsa el botón mágico.\n3. Espera unos segundos y descarga.")
 
-# --- ÁREA PRINCIPAL ---
-audio_file = st.file_uploader("Sube tu grabación aquí", type=['mp3', 'wav', 'm4a'])
+# Área de subida
+audio_file = st.file_uploader("Sube el archivo de audio (MP3, WAV, M4A)", type=['mp3', 'wav', 'm4a'])
 
 if audio_file is not None:
-    st.audio(audio_file, format='audio/mp3')
+    # Reproductor original
+    st.subheader("1. Audio Original")
+    st.audio(audio_file)
     
     # Botón de acción
-    if st.button("✨ Limpiar y Mejorar Audio (Modo Pro)"):
-        
-        # 1. Verificamos si el usuario puso el token en la caja
-        if not api_token_input:
-            st.error("⚠️ ¡Alto ahí! Necesitas pegar el API Token en la barra lateral izquierda para continuar.")
-        
-        # 2. Verificamos que el token parezca real (que empiece por r8_)
-        elif not api_token_input.startswith("r8_"):
-            st.error("⚠️ Ese token no parece válido. Debe empezar por 'r8_'. Revísalo.")
-            
+    if st.button("✨ Limpiar y Mejorar Audio"):
+        if not replicate_api:
+            st.error("⛔ No puedo procesar el audio porque falta la configuración del Token.")
         else:
-            # 3. Todo correcto, asignamos el token
-            os.environ["REPLICATE_API_TOKEN"] = api_token_input
-            
-            with st.spinner('⏳ Procesando con Resemble AI... (Paciencia, la alquimia tarda unos segundos)'):
+            with st.spinner('⏳ La IA está limpiando el ruido y ecualizando... (Esto tarda unos 30-60 segundos)'):
                 try:
-                    # Modelo actualizado según tu captura y documentación oficial
+                    # Modelo Resemble Enhance (Estándar de calidad actual)
                     model_id = "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2"
                     
                     output = replicate.run(
                         model_id,
                         input={
                             "input_audio": audio_file,
-                            "denoise_flag": True,  # Limpieza de ruido activada
-                            "solver": "Midpoint",
+                            "denoise_flag": True,  # Elimina ruidos de fondo (ventiladores, etc.)
+                            "solver": "Midpoint",  # Balance entre calidad y velocidad
                             "prior_temperature": 0.5
                         }
                     )
                     
-                    st.success("¡Alquimia completada!")
+                    # Resultado
+                    st.success("✅ ¡Proceso completado con éxito!")
+                    st.subheader("2. Audio Mejorado (Studio Quality)")
+                    st.audio(output)
                     
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown("**Original**")
-                        st.audio(audio_file)
-                    with col2:
-                        st.markdown("**Mejorado**")
-                        st.audio(output) # Streamlit detecta el formato solo
-                    
-                    # Link de descarga
-                    st.markdown(f'<a href="{output}" download="audio_mejorado.wav" style="background-color: #FF4B4B; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">📥 Descargar Audio Nuevo</a>', unsafe_allow_html=True)
+                    # Botón de descarga visualmente atractivo
+                    st.markdown(f'''
+                        <a href="{output}" download="mensaje_limpio_pro.wav">
+                            <button style="background-color: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">
+                                📥 Descargar Audio Listo para Publicar
+                            </button>
+                        </a>
+                    ''', unsafe_allow_html=True)
 
                 except Exception as e:
-                    st.error(f"Hubo un error técnico: {e}")
+                    st.error(f"😓 Hubo un error técnico inesperado: {str(e)}")
